@@ -8,15 +8,55 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
 
-  broker:
+  kafka:
     image: confluentinc/cp-kafka:latest
+    hostname: kafka
+    container_name: kafka
     depends_on:
       - zookeeper
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true' 
     ports:
       - 9092:9092
+
+  kafka-create-topics:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - kafka
+      - zookeeper
+    hostname: kafka-create-topics
+    working_dir: /scripts
+    command: ["bash", "./create-topics.sh"]
+    volumes:
+    - ./scripts:/scripts
+  
+  kafka_stream:
+    build: .
+    depends_on:
+      - kafka-create-topics
+      - kafka
+      - zookeeper
+    command: [ "bash", "./wait-for-it.sh", "kafka:9092", "-t", "100", "--", 
+              "java", "-jar", "/tmp/target/character-count-1.0-SNAPSHOT-jar-with-dependencies.jar"]
+
+  producer:
+    build: ./producer
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKER_URL: kafka:9092
+      INPUT_TOPIC: character-count-input
+    command: ["./wait-for-it.sh", "kafka:9092", "-t", "100", "--", "python", "-u", "main.py"]
+
+  consumer:
+    build: ./consumer
+    depends_on: 
+      - kafka
+    environment:
+      KAFKA_BROKER_URL: kafka:9092
+      OUTPUT_TOPIC: character-count-output
+    command: ["./wait-for-it.sh", "kafka:9092", "-t", "100", "--", "python", "-u", "main.py"]

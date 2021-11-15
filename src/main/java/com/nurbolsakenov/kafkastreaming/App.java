@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.Locale;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.protocol.types.Field.Array;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.KeyValue;
@@ -17,14 +18,14 @@ import org.apache.kafka.streams.kstream.*;
 import org.apache.log4j.PropertyConfigurator;
 
 public final class App {
-    public static final String INPUT_TOPIC = "word-count-input";
-    public static final String OUTPUT_TOPIC = "word-count-output";
+    public static final String INPUT_TOPIC = "character-count-input";
+    public static final String OUTPUT_TOPIC = "character-count-output";
 
     static Properties getStreamsConfig(final String[] args) {
 
         Properties config = new Properties();
         config.put(StreamsConfig.APPLICATION_ID_CONFIG, "kafkastreaming");
-        config.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        config.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "kafka:9092");
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         config.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 0);
         config.put(StreamsConfig.BUFFERED_RECORDS_PER_PARTITION_CONFIG, 0);
@@ -38,13 +39,16 @@ public final class App {
         final KStream<String, String> source = builder.stream(INPUT_TOPIC,
                 Consumed.with(Serdes.String(), Serdes.String()));
 
-        final KTable<Windowed<String>, Long> test = source
-                .flatMapValues(value -> Arrays.asList(value.toLowerCase(Locale.getDefault()).split("\\W+")))
+        String[] fieldsToExclude = { " ", "\""};
+        final KTable<Windowed<String>, Long> characterCount = source
+                .flatMapValues(value -> Arrays.asList(value.toLowerCase(Locale.getDefault()).split("")))
+                .filter((key, value) -> !Arrays.asList(fieldsToExclude).contains(value))
                 .groupBy((key, word) -> word, Grouped.with(Serdes.String(), Serdes.String()))
                 .windowedBy(TimeWindows.of(Duration.ofSeconds(1)))
-                .count(Materialized.as("test"));
+                .count(Materialized.as("characterCount"));
 
-        test.toStream().map((key, value) -> KeyValue.pair(key.key(), key.key() + ": " + value.toString()))
+        characterCount.toStream()
+                .map((key, value) -> KeyValue.pair(key.key(), String.format("{'key': '%s', 'value': %s}", key.key(), value.toString())))
                 .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.String()));
 
         source.foreach((key, value) -> {
@@ -53,7 +57,7 @@ public final class App {
     }
 
     public static void main(final String[] args) {
-        String log4jConfPath = "src/main/java/com/nurbolsakenov/resources/log4j.properties";
+        String log4jConfPath = "/app/log4j.properties";
         PropertyConfigurator.configure(log4jConfPath);
         final Properties props = getStreamsConfig(args);
 
