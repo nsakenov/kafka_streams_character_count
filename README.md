@@ -43,7 +43,7 @@ Topics:
 
 Example charachter-count-input:
 
-```json
+```
 hello
 ```
 Example charachter-count-output result:
