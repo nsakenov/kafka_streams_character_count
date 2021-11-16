@@ -59,7 +59,7 @@ public final class App {
     }
 
     public static void main(final String[] args) {
-        String log4jConfPath = "src/main/java/com/nurbolsakenov/resources/log4j.properties";//"/app/log4j.properties";
+        String log4jConfPath = "/app/log4j.properties";
         PropertyConfigurator.configure(log4jConfPath);
         final Properties props = getStreamsConfig(args);
 
