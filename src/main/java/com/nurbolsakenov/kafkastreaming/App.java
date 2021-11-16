@@ -4,10 +4,11 @@ import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Locale;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.common.protocol.types.Field.Array;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.KeyValue;
@@ -39,25 +40,26 @@ public final class App {
         final KStream<String, String> source = builder.stream(INPUT_TOPIC,
                 Consumed.with(Serdes.String(), Serdes.String()));
 
-        String[] fieldsToExclude = { " ", "\""};
+        String[] fieldsToExclude = { " ", "\"" };
         final KTable<Windowed<String>, Long> characterCount = source
                 .flatMapValues(value -> Arrays.asList(value.toLowerCase(Locale.getDefault()).split("")))
                 .filter((key, value) -> !Arrays.asList(fieldsToExclude).contains(value))
                 .groupBy((key, word) -> word, Grouped.with(Serdes.String(), Serdes.String()))
-                .windowedBy(TimeWindows.of(Duration.ofSeconds(1)))
-                .count(Materialized.as("characterCount"));
+                .windowedBy(TimeWindows.of(Duration.ofSeconds(1))).count(Materialized.as("characterCount"));
 
         characterCount.toStream()
-                .map((key, value) -> KeyValue.pair(key.key(), String.format("{'key': '%s', 'value': %s}", key.key(), value.toString())))
+                .map((key, value) -> KeyValue.pair(key.key(),
+                        String.format("{'key': '%s', 'value': %s}", key.key(), value.toString())))
                 .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.String()));
 
         source.foreach((key, value) -> {
             System.out.println("(DSL): " + value);
         });
+        
     }
 
     public static void main(final String[] args) {
-        String log4jConfPath = "/app/log4j.properties";
+        String log4jConfPath = "src/main/java/com/nurbolsakenov/resources/log4j.properties";//"/app/log4j.properties";
         PropertyConfigurator.configure(log4jConfPath);
         final Properties props = getStreamsConfig(args);
 

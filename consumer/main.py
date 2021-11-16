@@ -20,7 +20,9 @@ consumer = KafkaConsumer(
 def msg_process(msg):
     time_start = time.strftime("%Y-%m-%d %H:%M:%S")
     message = msg.decode("utf-8")
-    # message['time'] = time_start
+    message = message.replace("'","\"") 
+    message = json.loads(message)
+    message['time'] = str(time_start)
     return message
 
 # init Firebase
@@ -31,8 +33,8 @@ firestore_db = firebase_admin.firestore.client()
 #create & update
 
 for message in consumer:
-    result = message.value
+    result:dict = message.value
     print(result)
-    # doc_ref = firestore_db.collection(u'character-count-input').document(result['key'])
-    # doc_ref.set(result)
-    
+    #upload new data
+    doc_ref = firestore_db.collection(u'character-count-output').document(result['key'])
+    doc_ref.set(result)
