@@ -60,3 +60,4 @@ services:
       KAFKA_BROKER_URL: kafka:9092
       OUTPUT_TOPIC: character-count-output
     command: ["./wait-for-it.sh", "kafka:9092", "-t", "100", "--", "python", "-u", "main.py"]
+    restart: on-failure
